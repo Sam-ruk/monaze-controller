@@ -84,7 +84,7 @@ const Controller: React.FC<ControllerProps> = ({ gameId }) => {
     const requestPermission = (DeviceMotionEvent as any).requestPermission;
     if (requestPermission && typeof requestPermission === 'function') {
       requestPermission.call(DeviceMotionEvent)
-        .then((permissionState: string) => { // Explicitly type permissionState as string
+        .then((permissionState: string) => {
           if (permissionState === 'granted') {
             console.log('Motion sensor permission granted');
             window.addEventListener('devicemotion', handleMotion);
@@ -92,7 +92,7 @@ const Controller: React.FC<ControllerProps> = ({ gameId }) => {
             console.log('Motion sensor permission denied');
           }
         })
-        .catch(error => {
+        .catch((error: unknown) => { // Explicitly type error as unknown
           console.error('Permission request failed:', error);
           window.addEventListener('devicemotion', handleMotion); // Fallback for non-iOS
         });
