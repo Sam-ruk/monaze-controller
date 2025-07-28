@@ -13,6 +13,11 @@ const Controller: React.FC<ControllerProps> = ({ gameId }) => {
   const lastTilt = useRef<{ tiltX: number; tiltZ: number }>({ tiltX: 0, tiltZ: 0 });
   const targetTilt = useRef<{ tiltX: number; tiltZ: number }>({ tiltX: 0, tiltZ: 0 });
 
+  // Custom lerp function
+  const lerp = (start: number, end: number, factor: number) => {
+    return start + (end - start) * factor;
+  };
+
   useEffect(() => {
     socket.connect();
     socket.emit('join-game', gameId);
@@ -67,8 +72,8 @@ const Controller: React.FC<ControllerProps> = ({ gameId }) => {
 
       // Smooth interpolation toward target values
       const lerpFactor = 0.1; // Adjust for smoothness (0 to 1, lower = smoother)
-      targetTilt.current.tiltX = THREE.MathUtils.lerp(targetTilt.current.tiltX, targetX, lerpFactor);
-      targetTilt.current.tiltZ = THREE.MathUtils.lerp(targetTilt.current.tiltZ, targetZ, lerpFactor);
+      targetTilt.current.tiltX = lerp(targetTilt.current.tiltX, targetX, lerpFactor);
+      targetTilt.current.tiltZ = lerp(targetTilt.current.tiltZ, targetZ, lerpFactor);
 
       lastTilt.current = { tiltX: targetTilt.current.tiltX, tiltZ: targetTilt.current.tiltZ };
       setTiltData({ tiltX: targetTilt.current.tiltX, tiltZ: targetTilt.current.tiltZ });
