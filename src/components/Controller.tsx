@@ -92,16 +92,17 @@ const Controller: React.FC<ControllerProps> = ({ gameId }) => {
           setPermissionStatus('Failed');
           // Fallback for non-iOS or failed request
           if (navigator.permissions) {
-            navigator.permissions.query({ name: 'accelerometer' }).then((permissionStatus) => {
-              if (permissionStatus.state === 'granted') {
-                console.log('Accelerometer permission already granted via settings');
-                setPermissionStatus('Granted');
-                window.addEventListener('devicemotion', handleMotion);
-              } else {
-                setPermissionStatus('Blocked - Enable in Browser Settings');
-                console.log('Motion sensors blocked, please enable in browser settings');
-              }
-            });
+            navigator.permissions.query({ name: 'motion' as PermissionName }) // Use 'motion' with type assertion
+              .then((permissionStatus) => {
+                if (permissionStatus.state === 'granted') {
+                  console.log('Motion permission already granted via settings');
+                  setPermissionStatus('Granted');
+                  window.addEventListener('devicemotion', handleMotion);
+                } else {
+                  setPermissionStatus('Blocked - Enable in Browser Settings');
+                  console.log('Motion sensors blocked, please enable in browser settings');
+                }
+              });
           } else {
             setPermissionStatus('Blocked - Enable in Browser Settings');
             console.log('Permissions API not supported, enable in browser settings');
