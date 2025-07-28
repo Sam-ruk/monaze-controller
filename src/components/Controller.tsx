@@ -98,17 +98,17 @@ const Controller: React.FC<ControllerProps> = ({ gameId }) => {
         // Smooth transition with lower thresholds for smaller tilts
         if (filteredX > 1) {
           // Left tilt (A)
-          targetX = -0.35;
+          targetX = -0.5;
         } else if (filteredX < -1) {
           // Right tilt (D)
-          targetX = 0.35;
+          targetX = 0.5;
         }
         if (filteredY < -0.5) {
           // Forward tilt (W)
-          targetZ = -0.35;
+          targetZ = -0.5;
         } else if (filteredY > 1) {
           // Backward tilt (S)
-          targetZ = 0.35;
+          targetZ = 0.5;
         }
       }
 
