@@ -11,6 +11,9 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <html lang="en">
+      <head>
+        <meta http-equiv="Permissions-Policy" content="gyroscope=*, accelerometer=*" />
+      </head>
       <body>
         <ClientWrapper>
           {children}
