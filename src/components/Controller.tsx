@@ -11,6 +11,7 @@ const Controller: React.FC<ControllerProps> = ({ gameId }) => {
   const [connectionStatus, setConnectionStatus] = useState<string>('Disconnected');
   const [tiltData, setTiltData] = useState<{ tiltX: number; tiltZ: number }>({ tiltX: 0, tiltZ: 0 });
   const lastTilt = useRef<{ tiltX: number; tiltZ: number }>({ tiltX: 0, tiltZ: 0 });
+  const targetTilt = useRef<{ tiltX: number; tiltZ: number }>({ tiltX: 0, tiltZ: 0 });
 
   useEffect(() => {
     socket.connect();
@@ -32,7 +33,7 @@ const Controller: React.FC<ControllerProps> = ({ gameId }) => {
     let lastUpdate = Date.now();
     const handleMotion = (event: DeviceMotionEvent) => {
       const now = Date.now();
-      if (now - lastUpdate < 100) return; // Limit updates to 10Hz to reduce noise
+      if (now - lastUpdate < 100) return; // Limit to 10Hz to reduce noise
       lastUpdate = now;
 
       const rawX = event.accelerationIncludingGravity?.x ?? 0;
@@ -40,39 +41,38 @@ const Controller: React.FC<ControllerProps> = ({ gameId }) => {
       const rawZ = event.accelerationIncludingGravity?.z ?? 0;
       console.log('Raw motion data:', { x: rawX, y: rawY, z: rawZ });
 
-      let tiltX = 0, tiltZ = 0;
+      let targetX = 0, targetZ = 0;
 
-      // Dead zone to filter noise (approx. ±1 m/s²)
+      // Dead zone to filter noise (±1 m/s²)
       if (Math.abs(rawX) < 1 && Math.abs(rawY) < 1 && Math.abs(rawZ - 9.81) < 1) {
-        tiltX = 0;
-        tiltZ = 0;
+        targetX = 0;
+        targetZ = 0;
       } else {
-        // Low-pass filter to smooth data
-        tiltX = lastTilt.current.tiltX * 0.7 + rawX * 0.3;
-        tiltZ = lastTilt.current.tiltZ * 0.7 + rawY * 0.3; // Using Y for Z tilt
+        // Low-pass filter and sensitivity adjustment
+        const filteredX = lastTilt.current.tiltX * 0.7 + rawX * 0.3;
+        const filteredY = lastTilt.current.tiltZ * 0.7 + rawY * 0.3;
 
-        // Discrete thresholds based on your WASD mappings
-        if (tiltX > 2) { // Left tilt (A)
-          tiltX = -0.5;
-          tiltZ = 0;
-        } else if (tiltX < -2) { // Right tilt (D)
-          tiltX = 0.5;
-          tiltZ = 0;
-        } else if (tiltZ < -1) { // Forward tilt (W)
-          tiltX = 0;
-          tiltZ = -0.5;
-        } else if (tiltZ > 2) { // Backward tilt (S)
-          tiltX = 0;
-          tiltZ = 0.5;
-        } else {
-          tiltX = 0;
-          tiltZ = 0;
+        // Smooth transition with lower thresholds for smaller tilts
+        if (filteredX > 1) { // Left tilt (A)
+          targetX = -0.5;
+        } else if (filteredX < -1) { // Right tilt (D)
+          targetX = 0.5;
+        }
+        if (filteredY < -0.5) { // Forward tilt (W)
+          targetZ = -0.5;
+        } else if (filteredY > 1) { // Backward tilt (S)
+          targetZ = 0.5;
         }
       }
 
-      lastTilt.current = { tiltX, tiltZ };
-      setTiltData({ tiltX, tiltZ });
-      socket.emit('tilt-data', { gameId, tiltX, tiltZ });
+      // Smooth interpolation toward target values
+      const lerpFactor = 0.1; // Adjust for smoothness (0 to 1, lower = smoother)
+      targetTilt.current.tiltX = THREE.MathUtils.lerp(targetTilt.current.tiltX, targetX, lerpFactor);
+      targetTilt.current.tiltZ = THREE.MathUtils.lerp(targetTilt.current.tiltZ, targetZ, lerpFactor);
+
+      lastTilt.current = { tiltX: targetTilt.current.tiltX, tiltZ: targetTilt.current.tiltZ };
+      setTiltData({ tiltX: targetTilt.current.tiltX, tiltZ: targetTilt.current.tiltZ });
+      socket.emit('tilt-data', { gameId, tiltX: targetTilt.current.tiltX, tiltZ: targetTilt.current.tiltZ });
     };
 
     console.log('Adding devicemotion listener');
