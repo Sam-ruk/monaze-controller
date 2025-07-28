@@ -16,12 +16,23 @@ const Controller: React.FC<ControllerProps> = ({ gameId }) => {
     if (typeof (DeviceOrientationEvent as any).requestPermission === 'function') {
       try {
         const permission = await (DeviceOrientationEvent as any).requestPermission();
-        setHasPermission(permission === 'granted');
+        if (permission === 'granted') {
+          setHasPermission(true);
+          console.log('Device orientation permission granted');
+        } else {
+          console.log('Device orientation permission denied');
+        }
       } catch (error) {
         console.error('Permission request failed:', error);
       }
     } else {
-      setHasPermission(true);
+      // For non-iOS devices, check if DeviceOrientationEvent is supported
+      if (window.DeviceOrientationEvent) {
+        setHasPermission(true);
+        console.log('Device orientation supported (non-iOS)');
+      } else {
+        console.log('Device orientation not supported');
+      }
     }
   };
 
@@ -42,9 +53,18 @@ const Controller: React.FC<ControllerProps> = ({ gameId }) => {
   }, [gameId, socket]);
 
   useEffect(() => {
+    if (!hasPermission) return;
+
     const handleOrientation = (event: DeviceOrientationEvent) => {
-      const beta = event.beta ?? 0;
-      const gamma = event.gamma ?? 0;
+      console.log('Raw orientation data:', {
+        alpha: event.alpha,
+        beta: event.beta,
+        gamma: event.gamma
+      });
+
+      const beta = event.beta ?? 0;   // front-to-back tilt (-180 to 180)
+      const gamma = event.gamma ?? 0; // left-to-right tilt (-90 to 90)
+      
       const maxTilt = 25;
       let tiltX = (beta / maxTilt) * 0.25;
       let tiltZ = (gamma / maxTilt) * 0.25;
@@ -52,16 +72,21 @@ const Controller: React.FC<ControllerProps> = ({ gameId }) => {
       tiltZ = Math.max(-0.25, Math.min(0.25, tiltZ));
       
       setTiltData({tiltX, tiltZ});
-      console.log('Sending tilt:', {gameId, tiltX, tiltZ});
+      console.log('Processed tilt:', {gameId, tiltX, tiltZ});
       socket.emit('tilt-data', { gameId, tiltX, tiltZ });
     };
 
-    if (hasPermission) {
-      window.addEventListener('deviceorientation', handleOrientation);
-    }
+    console.log('Adding deviceorientation listener');
+    window.addEventListener('deviceorientation', handleOrientation, true);
+
+    // Test if events are firing
+    const testHandler = () => console.log('Device orientation event fired!');
+    window.addEventListener('deviceorientation', testHandler, true);
 
     return () => {
-      window.removeEventListener('deviceorientation', handleOrientation);
+      console.log('Removing deviceorientation listener');
+      window.removeEventListener('deviceorientation', handleOrientation, true);
+      window.removeEventListener('deviceorientation', testHandler, true);
     };
   }, [hasPermission, gameId, socket]);
 
