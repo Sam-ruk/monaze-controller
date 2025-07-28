@@ -2,165 +2,119 @@
 import { useEffect, useContext, useState, useRef } from 'react';
 import { SocketContext } from '@/contexts/SocketContext';
 
-// Define interface for Controller props
 interface ControllerProps {
   gameId: string;
 }
 
-// Define interface for tilt data
-interface TiltData {
-  tiltX: number;
-  tiltZ: number;
-  lastUpdate?: number;
-}
-
-// Extend DeviceMotionEvent to include requestPermission for TypeScript
-interface DeviceMotionEventWithPermission extends DeviceMotionEvent {
-  requestPermission?: () => Promise<'granted' | 'denied'>;
-}
-
-// Type guard to check if DeviceMotionEvent has requestPermission
-const hasRequestPermission = (obj: any): obj is DeviceMotionEventWithPermission => {
-  return 'requestPermission' in obj && typeof obj.requestPermission === 'function';
-};
-
 const Controller: React.FC<ControllerProps> = ({ gameId }) => {
   const socket = useContext(SocketContext);
   const [connectionStatus, setConnectionStatus] = useState<string>('Disconnected');
-  const [tiltData, setTiltData] = useState<TiltData>({ tiltX: 0, tiltZ: 0 });
-  const lastTilt = useRef<TiltData>({ tiltX: 0, tiltZ: 0 });
-  const targetTilt = useRef<TiltData>({ tiltX: 0, tiltZ: 0 });
-  const hasMotionListener = useRef<boolean>(false);
+  const [tiltData, setTiltData] = useState<{ tiltX: number; tiltZ: number }>({ tiltX: 0, tiltZ: 0 });
+  const [permissionStatus, setPermissionStatus] = useState<string>('unknown');
+  const lastTilt = useRef<{ tiltX: number; tiltZ: number }>({ tiltX: 0, tiltZ: 0 });
+  const targetTilt = useRef<{ tiltX: number; tiltZ: number }>({ tiltX: 0, tiltZ: 0 });
 
   // Custom lerp function
-  const lerp = (start: number, end: number, factor: number): number => {
+  const lerp = (start: number, end: number, factor: number) => {
     return start + (end - start) * factor;
   };
 
-  // Handle device motion
-  const handleMotion = (event: DeviceMotionEvent) => {
-    const now = Date.now();
-    const lastUpdate = lastTilt.current.lastUpdate || Date.now();
-    if (now - lastUpdate < 100) return; // Limit to 10Hz to reduce noise
-    lastTilt.current.lastUpdate = now;
-
-    const rawX = event.accelerationIncludingGravity?.x ?? 0;
-    const rawY = event.accelerationIncludingGravity?.y ?? 0;
-    const rawZ = event.accelerationIncludingGravity?.z ?? 0;
-    console.log('Raw motion data:', { x: rawX, y: rawY, z: rawZ, timestamp: now });
-
-    let targetX = 0,
-      targetZ = 0;
-
-    // Dead zone to filter noise (±1 m/s²)
-    if (Math.abs(rawX) < 1 && Math.abs(rawY) < 1 && Math.abs(rawZ - 9.81) < 1) {
-      targetX = 0;
-      targetZ = 0;
-    } else {
-      // Low-pass filter and sensitivity adjustment
-      const filteredX = lastTilt.current.tiltX * 0.7 + rawX * 0.3;
-      const filteredY = lastTilt.current.tiltZ * 0.7 + rawY * 0.3;
-
-      // Smooth transition with lower thresholds for smaller tilts
-      if (filteredX > 1) {
-        // Left tilt (A)
-        targetX = -0.5;
-      } else if (filteredX < -1) {
-        // Right tilt (D)
-        targetX = 0.5;
-      }
-      if (filteredY < -0.5) {
-        // Forward tilt (W)
-        targetZ = -0.5;
-      } else if (filteredY > 1) {
-        // Backward tilt (S)
-        targetZ = 0.5;
-      }
-    }
-
-    // Smooth interpolation toward target values
-    const lerpFactor = 0.1; // Adjust for smoothness (0 to 1, lower = smoother)
-    targetTilt.current.tiltX = lerp(targetTilt.current.tiltX, targetX, lerpFactor);
-    targetTilt.current.tiltZ = lerp(targetTilt.current.tiltZ, targetZ, lerpFactor);
-
-    lastTilt.current = { tiltX: targetTilt.current.tiltX, tiltZ: targetTilt.current.tiltZ, lastUpdate: now };
-    setTiltData({ tiltX: targetTilt.current.tiltX, tiltZ: targetTilt.current.tiltZ });
-    console.log('Updated tilt data:', { tiltX: targetTilt.current.tiltX, tiltZ: targetTilt.current.tiltZ });
-    socket.emit('tilt-data', { gameId, tiltX: targetTilt.current.tiltX, tiltZ: targetTilt.current.tiltZ });
-  };
-
-  // Request motion permission
+  // Request motion permission (simplified)
   const requestMotionPermission = async () => {
-    console.log('Attempting to request motion permission');
-    if (
-      typeof DeviceMotionEvent !== 'undefined' &&
-      hasRequestPermission(DeviceMotionEvent)
-    ) {
+    if (typeof DeviceMotionEvent !== 'undefined' && 'requestPermission' in DeviceMotionEvent) {
       try {
-        const permission = await DeviceMotionEvent.requestPermission!();
-        console.log('Permission result:', permission);
-        if (permission === 'granted') {
-          setConnectionStatus('Connected (Motion permission granted)');
-          if (!hasMotionListener.current) {
-            console.log('Adding devicemotion listener after permission granted');
-            window.addEventListener('devicemotion', handleMotion);
-            hasMotionListener.current = true;
-          }
-        } else {
-          setConnectionStatus('Motion permission denied. Please enable motion sensors.');
-        }
+        const permission = await (DeviceMotionEvent as any).requestPermission();
+        setPermissionStatus(permission);
+        return permission === 'granted';
       } catch (error) {
         console.error('Error requesting motion permission:', error);
-        setConnectionStatus('Error accessing motion sensors. Please check browser settings.');
+        setPermissionStatus('error');
+        return false;
       }
     } else {
-      // Fallback for browsers that don't require explicit permission
-      setConnectionStatus('Connected (No permission required)');
-      if (!hasMotionListener.current) {
-        console.log('Adding devicemotion listener (no permission required)');
-        window.addEventListener('devicemotion', handleMotion);
-        hasMotionListener.current = true;
-      }
+      // No permission needed (Android or older iOS)
+      setPermissionStatus('granted');
+      return true;
     }
   };
 
   useEffect(() => {
-    // Connect socket and handle events
-    console.log('Connecting socket and joining game:', gameId);
     socket.connect();
     socket.emit('join-game', gameId);
 
-    socket.on('connect', () => {
-      console.log('Socket connected');
-      setConnectionStatus('Connected');
-    });
-    socket.on('disconnect', () => {
-      console.log('Socket disconnected');
-      setConnectionStatus('Disconnected');
-    });
-    socket.on('joined-game', (data: { gameId: string }) => {
-      console.log('Joined game:', data.gameId);
-      setConnectionStatus(`Joined: ${data.gameId}`);
-    });
+    socket.on('connect', () => setConnectionStatus('Connected'));
+    socket.on('disconnect', () => setConnectionStatus('Disconnected'));
+    socket.on('joined-game', (data) => setConnectionStatus(`Joined: ${data.gameId}`));
 
-    // Initialize motion listener
-    console.log('Initializing motion listener');
-    requestMotionPermission();
-
-    // Cleanup
     return () => {
-      console.log('Cleaning up: removing socket and motion listeners');
       socket.off('connect');
       socket.off('disconnect');
       socket.off('joined-game');
       socket.disconnect();
-      if (hasMotionListener.current) {
-        console.log('Removing devicemotion listener');
-        window.removeEventListener('devicemotion', handleMotion);
-        hasMotionListener.current = false;
-      }
     };
   }, [gameId, socket]);
+
+  useEffect(() => {
+    let lastUpdate = Date.now();
+    const handleMotion = (event: DeviceMotionEvent) => {
+      const now = Date.now();
+      if (now - lastUpdate < 100) return; // Limit to 10Hz to reduce noise
+      lastUpdate = now;
+
+      const rawX = event.accelerationIncludingGravity?.x ?? 0;
+      const rawY = event.accelerationIncludingGravity?.y ?? 0;
+      const rawZ = event.accelerationIncludingGravity?.z ?? 0;
+      console.log('Raw motion data:', { x: rawX, y: rawY, z: rawZ });
+
+      let targetX = 0, targetZ = 0;
+
+      // Dead zone to filter noise (±1 m/s²)
+      if (Math.abs(rawX) < 1 && Math.abs(rawY) < 1 && Math.abs(rawZ - 9.81) < 1) {
+        targetX = 0;
+        targetZ = 0;
+      } else {
+        // Low-pass filter and sensitivity adjustment
+        const filteredX = lastTilt.current.tiltX * 0.7 + rawX * 0.3;
+        const filteredY = lastTilt.current.tiltZ * 0.7 + rawY * 0.3;
+
+        // Smooth transition with lower thresholds for smaller tilts
+        if (filteredX > 1) { // Left tilt (A)
+          targetX = -0.5;
+        } else if (filteredX < -1) { // Right tilt (D)
+          targetX = 0.5;
+        }
+        if (filteredY < -0.5) { // Forward tilt (W)
+          targetZ = -0.5;
+        } else if (filteredY > 1) { // Backward tilt (S)
+          targetZ = 0.5;
+        }
+      }
+
+      // Smooth interpolation toward target values
+      const lerpFactor = 0.1; // Adjust for smoothness (0 to 1, lower = smoother)
+      targetTilt.current.tiltX = lerp(targetTilt.current.tiltX, targetX, lerpFactor);
+      targetTilt.current.tiltZ = lerp(targetTilt.current.tiltZ, targetZ, lerpFactor);
+
+      lastTilt.current = { tiltX: targetTilt.current.tiltX, tiltZ: targetTilt.current.tiltZ };
+      setTiltData({ tiltX: targetTilt.current.tiltX, tiltZ: targetTilt.current.tiltZ });
+      socket.emit('tilt-data', { gameId, tiltX: targetTilt.current.tiltX, tiltZ: targetTilt.current.tiltZ });
+    };
+
+    // Only add listener if permission is granted or not needed
+    if (permissionStatus === 'granted') {
+      console.log('Adding devicemotion listener');
+      window.addEventListener('devicemotion', handleMotion);
+      return () => {
+        console.log('Removing devicemotion listener');
+        window.removeEventListener('devicemotion', handleMotion);
+      };
+    }
+  }, [gameId, socket, permissionStatus]);
+
+  // Initialize permission on mount
+  useEffect(() => {
+    requestMotionPermission();
+  }, []);
 
   return (
     <div
@@ -178,22 +132,32 @@ const Controller: React.FC<ControllerProps> = ({ gameId }) => {
     >
       <h2>Neon Maze Controller</h2>
       <p>Status: {connectionStatus}</p>
-      {connectionStatus.includes('denied') && (
+      <p>Motion Permission: {permissionStatus}</p>
+      
+      {permissionStatus === 'denied' && (
         <button
-          onClick={() => requestMotionPermission()}
+          onClick={requestMotionPermission}
           style={{
-            padding: '10px',
+            padding: '10px 20px',
             fontSize: '16px',
             cursor: 'pointer',
             background: '#d400ff',
             color: '#fff',
             border: 'none',
             borderRadius: '5px',
+            margin: '10px',
           }}
         >
           Request Motion Permission
         </button>
       )}
+      
+      {permissionStatus === 'error' && (
+        <p style={{ color: '#ff4444' }}>
+          Error accessing motion sensors. Please check browser settings.
+        </p>
+      )}
+      
       <p>Tilt: X={tiltData.tiltX.toFixed(2)}, Z={tiltData.tiltZ.toFixed(2)}</p>
       <p>Tilt your phone to control the maze!</p>
     </div>
