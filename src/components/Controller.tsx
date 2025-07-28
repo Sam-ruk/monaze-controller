@@ -84,7 +84,7 @@ const Controller: React.FC<ControllerProps> = ({ gameId }) => {
     const requestPermission = (DeviceMotionEvent as any).requestPermission;
     if (requestPermission && typeof requestPermission === 'function') {
       requestPermission.call(DeviceMotionEvent)
-        .then(permissionState => {
+        .then((permissionState: string) => { // Explicitly type permissionState as string
           if (permissionState === 'granted') {
             console.log('Motion sensor permission granted');
             window.addEventListener('devicemotion', handleMotion);
