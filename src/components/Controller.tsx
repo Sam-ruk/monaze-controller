@@ -11,6 +11,7 @@ interface ControllerProps {
 interface TiltData {
   tiltX: number;
   tiltZ: number;
+  lastUpdate?: number; // Add lastUpdate as an optional property
 }
 
 // Extend DeviceMotionEvent to include requestPermission for TypeScript
