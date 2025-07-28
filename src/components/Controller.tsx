@@ -80,9 +80,10 @@ const Controller: React.FC<ControllerProps> = ({ gameId }) => {
       socket.emit('tilt-data', { gameId, tiltX: targetTilt.current.tiltX, tiltZ: targetTilt.current.tiltZ });
     };
 
-    // Request permission for motion sensors
-    if (typeof DeviceMotionEvent.requestPermission === 'function') {
-      DeviceMotionEvent.requestPermission()
+    // Request permission for motion sensors with type assertion
+    const requestPermission = (DeviceMotionEvent as any).requestPermission;
+    if (requestPermission && typeof requestPermission === 'function') {
+      requestPermission.call(DeviceMotionEvent)
         .then(permissionState => {
           if (permissionState === 'granted') {
             console.log('Motion sensor permission granted');
@@ -91,9 +92,12 @@ const Controller: React.FC<ControllerProps> = ({ gameId }) => {
             console.log('Motion sensor permission denied');
           }
         })
-        .catch(console.error);
+        .catch(error => {
+          console.error('Permission request failed:', error);
+          window.addEventListener('devicemotion', handleMotion); // Fallback for non-iOS
+        });
     } else {
-      console.log('Requesting permission not supported, adding listener directly');
+      console.log('Permission request not supported, adding listener directly');
       window.addEventListener('devicemotion', handleMotion);
     }
 
