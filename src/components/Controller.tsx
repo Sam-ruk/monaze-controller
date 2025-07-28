@@ -12,6 +12,7 @@ const Controller: React.FC<ControllerProps> = ({ gameId }) => {
   const [tiltData, setTiltData] = useState<{ tiltX: number; tiltZ: number }>({ tiltX: 0, tiltZ: 0 });
   const lastTilt = useRef<{ tiltX: number; tiltZ: number }>({ tiltX: 0, tiltZ: 0 });
   const targetTilt = useRef<{ tiltX: number; tiltZ: number }>({ tiltX: 0, tiltZ: 0 });
+  const [permissionGranted, setPermissionGranted] = useState<boolean>(false);
 
   // Custom lerp function
   const lerp = (start: number, end: number, factor: number) => {
@@ -82,30 +83,61 @@ const Controller: React.FC<ControllerProps> = ({ gameId }) => {
 
     // Request permission for motion sensors with type assertion
     const requestPermission = (DeviceMotionEvent as any).requestPermission;
-    if (requestPermission && typeof requestPermission === 'function') {
-      requestPermission.call(DeviceMotionEvent)
-        .then((permissionState: string) => {
+    const requestMotionPermission = async () => {
+      if (requestPermission && typeof requestPermission === 'function') {
+        try {
+          const permissionState = await requestPermission.call(DeviceMotionEvent);
           if (permissionState === 'granted') {
             console.log('Motion sensor permission granted');
+            setPermissionGranted(true);
             window.addEventListener('devicemotion', handleMotion);
           } else {
             console.log('Motion sensor permission denied');
           }
-        })
-        .catch((error: unknown) => { // Explicitly type error as unknown
+        } catch (error: unknown) {
           console.error('Permission request failed:', error);
+          setPermissionGranted(false);
           window.addEventListener('devicemotion', handleMotion); // Fallback for non-iOS
-        });
-    } else {
-      console.log('Permission request not supported, adding listener directly');
-      window.addEventListener('devicemotion', handleMotion);
-    }
+        }
+      } else {
+        console.log('Permission request not supported, adding listener directly');
+        setPermissionGranted(true);
+        window.addEventListener('devicemotion', handleMotion);
+      }
+    };
+
+    requestMotionPermission();
 
     return () => {
       console.log('Removing devicemotion listener');
       window.removeEventListener('devicemotion', handleMotion);
     };
   }, [gameId, socket]);
+
+  const handleRequestPermission = () => {
+    const requestPermission = (DeviceMotionEvent as any).requestPermission;
+    if (requestPermission && typeof requestPermission === 'function' && !permissionGranted) {
+      requestPermission.call(DeviceMotionEvent)
+        .then((permissionState: string) => {
+          if (permissionState === 'granted') {
+            console.log('Motion sensor permission granted via button');
+            setPermissionGranted(true);
+            window.addEventListener('devicemotion', handleMotion);
+          } else {
+            console.log('Motion sensor permission denied via button');
+          }
+        })
+        .catch((error: unknown) => {
+          console.error('Permission request failed via button:', error);
+          setPermissionGranted(false);
+          window.addEventListener('devicemotion', handleMotion); // Fallback
+        });
+    } else if (!permissionGranted) {
+      console.log('Permission request not supported or already granted, adding listener directly');
+      setPermissionGranted(true);
+      window.addEventListener('devicemotion', handleMotion);
+    }
+  };
 
   return (
     <div
@@ -126,6 +158,23 @@ const Controller: React.FC<ControllerProps> = ({ gameId }) => {
       <p>Game ID: {gameId}</p>
       <p>Tilt: X={tiltData.tiltX.toFixed(2)}, Z={tiltData.tiltZ.toFixed(2)}</p>
       <p>Tilt your phone to control the maze!</p>
+      {!permissionGranted && (
+        <button
+          onClick={handleRequestPermission}
+          style={{
+            marginTop: '10px',
+            padding: '10px 20px',
+            background: '#d400ff',
+            color: '#1a0033',
+            border: 'none',
+            borderRadius: '5px',
+            cursor: 'pointer',
+            fontFamily: 'Orbitron, sans-serif',
+          }}
+        >
+          Grant Motion Sensor Permission
+        </button>
+      )}
     </div>
   );
 };
