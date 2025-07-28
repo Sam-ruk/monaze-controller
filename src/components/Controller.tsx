@@ -37,8 +37,8 @@ const Controller: React.FC<ControllerProps> = ({ gameId }) => {
       const x = (event.accelerationIncludingGravity?.x ?? 0) / 9.81; // Normalize to ~[-1, 1]
       const z = (event.accelerationIncludingGravity?.y ?? 0) / 9.81; // Using y for Z tilt (adjust axes as needed)
       const maxTilt = 1;
-      const tiltX = Math.max(-0.5, Math.min(0.5, x / maxTilt * 0.5));
-      const tiltZ = Math.max(-0.5, Math.min(0.5, z / maxTilt * 0.5));
+      let tiltX = Math.max(-0.5, Math.min(0.5, x / maxTilt * 0.5));
+      let tiltZ = Math.max(-0.5, Math.min(0.5, z / maxTilt * 0.5));
       setTiltData({ tiltX, tiltZ });
       socket.emit('tilt-data', { gameId, tiltX, tiltZ });
     };
