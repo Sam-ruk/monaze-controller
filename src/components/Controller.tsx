@@ -11,7 +11,7 @@ interface ControllerProps {
 interface TiltData {
   tiltX: number;
   tiltZ: number;
-  lastUpdate?: number; // Add lastUpdate as an optional property
+  lastUpdate?: number;
 }
 
 // Extend DeviceMotionEvent to include requestPermission for TypeScript
@@ -34,31 +34,6 @@ const Controller: React.FC<ControllerProps> = ({ gameId }) => {
   // Custom lerp function
   const lerp = (start: number, end: number, factor: number): number => {
     return start + (end - start) * factor;
-  };
-
-  // Request motion permission and handle devicemotion
-  const requestMotionPermission = async () => {
-    if (
-      typeof DeviceMotionEvent !== 'undefined' &&
-      hasRequestPermission(DeviceMotionEvent)
-    ) {
-      try {
-        const permission = await DeviceMotionEvent.requestPermission!();
-        if (permission === 'granted') {
-          setConnectionStatus('Connected (Motion permission granted)');
-          window.addEventListener('devicemotion', handleMotion);
-        } else {
-          setConnectionStatus('Motion permission denied. Please enable motion sensors in your browser settings.');
-        }
-      } catch (error) {
-        console.error('Error requesting motion permission:', error);
-        setConnectionStatus('Error accessing motion sensors. Please check browser settings.');
-      }
-    } else {
-      // Fallback for browsers that don't require explicit permission
-      setConnectionStatus('Connected (No permission required)');
-      window.addEventListener('devicemotion', handleMotion);
-    }
   };
 
   // Handle device motion
@@ -112,6 +87,33 @@ const Controller: React.FC<ControllerProps> = ({ gameId }) => {
     socket.emit('tilt-data', { gameId, tiltX: targetTilt.current.tiltX, tiltZ: targetTilt.current.tiltZ });
   };
 
+  // Request motion permission
+  const requestMotionPermission = async () => {
+    if (
+      typeof DeviceMotionEvent !== 'undefined' &&
+      hasRequestPermission(DeviceMotionEvent)
+    ) {
+      try {
+        const permission = await DeviceMotionEvent.requestPermission!();
+        if (permission === 'granted') {
+          setConnectionStatus('Connected (Motion permission granted)');
+          console.log('Adding devicemotion listener after permission granted');
+          window.addEventListener('devicemotion', handleMotion);
+        } else {
+          setConnectionStatus('Motion permission denied. Please enable motion sensors in your browser settings.');
+        }
+      } catch (error) {
+        console.error('Error requesting motion permission:', error);
+        setConnectionStatus('Error accessing motion sensors. Please check browser settings.');
+      }
+    } else {
+      // Fallback for browsers that don't require explicit permission
+      setConnectionStatus('Connected (No permission required)');
+      console.log('Adding devicemotion listener (no permission required)');
+      window.addEventListener('devicemotion', handleMotion);
+    }
+  };
+
   useEffect(() => {
     // Connect socket and handle events
     socket.connect();
@@ -123,6 +125,7 @@ const Controller: React.FC<ControllerProps> = ({ gameId }) => {
       setConnectionStatus(`Joined: ${data.gameId}`)
     );
 
+    // Initialize motion listener
     console.log('Initializing motion listener');
     requestMotionPermission();
 
@@ -156,7 +159,15 @@ const Controller: React.FC<ControllerProps> = ({ gameId }) => {
       {connectionStatus.includes('denied') && (
         <button
           onClick={() => requestMotionPermission()}
-          style={{ padding: '10px', fontSize: '16px', cursor: 'pointer', background: '#d400ff', color: '#fff', border: 'none', borderRadius: '5px' }}
+          style={{
+            padding: '10px',
+            fontSize: '16px',
+            cursor: 'pointer',
+            background: '#d400ff',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '5px',
+          }}
         >
           Request Motion Permission
         </button>
