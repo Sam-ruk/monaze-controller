@@ -12,17 +12,18 @@ const Controller: React.FC<ControllerProps> = ({ gameId }) => {
   const [tiltData, setTiltData] = useState<{ tiltX: number; tiltZ: number }>({ tiltX: 0, tiltZ: 0 });
   const lastTilt = useRef<{ tiltX: number; tiltZ: number }>({ tiltX: 0, tiltZ: 0 });
   const targetTilt = useRef<{ tiltX: number; tiltZ: number }>({ tiltX: 0, tiltZ: 0 });
-  const [permissionGranted, setPermissionGranted] = useState<boolean>(false);
+  const [permissionStatus, setPermissionStatus] = useState<string>('Not Requested');
+  const lastUpdateRef = useRef<number>(Date.now());
 
   // Custom lerp function
   const lerp = (start: number, end: number, factor: number) => {
     return start + (end - start) * factor;
   };
 
-  // Define handleMotion outside useEffect
+  // Handle motion events
   const handleMotion = (event: DeviceMotionEvent) => {
     const now = Date.now();
-    if (now - (lastUpdateRef.current || 0) < 100) return; // Limit to 10Hz to reduce noise
+    if (now - lastUpdateRef.current < 100) return; // Limit to 10Hz to reduce noise
     lastUpdateRef.current = now;
 
     const rawX = event.accelerationIncludingGravity?.x ?? 0;
@@ -37,25 +38,16 @@ const Controller: React.FC<ControllerProps> = ({ gameId }) => {
       targetX = 0;
       targetZ = 0;
     } else {
-      // Low-pass filter and sensitivity adjustment
       const filteredX = lastTilt.current.tiltX * 0.7 + rawX * 0.3;
       const filteredY = lastTilt.current.tiltZ * 0.7 + rawY * 0.3;
 
-      // Smooth transition with lower thresholds for smaller tilts
-      if (filteredX > 1) { // Left tilt
-        targetX = -0.5;
-      } else if (filteredX < -1) { // Right tilt
-        targetX = 0.5;
-      }
-      if (filteredY < -0.5) { // Forward tilt
-        targetZ = -0.5;
-      } else if (filteredY > 1) { // Backward tilt
-        targetZ = 0.5;
-      }
+      if (filteredX > 1) targetX = -0.5; // Left tilt
+      else if (filteredX < -1) targetX = 0.5; // Right tilt
+      if (filteredY < -0.5) targetZ = -0.5; // Forward tilt
+      else if (filteredY > 1) targetZ = 0.5; // Backward tilt
     }
 
-    // Smooth interpolation toward target values
-    const lerpFactor = 0.1; // Adjust for smoothness (0 to 1, lower = smoother)
+    const lerpFactor = 0.1;
     targetTilt.current.tiltX = lerp(targetTilt.current.tiltX, targetX, lerpFactor);
     targetTilt.current.tiltZ = lerp(targetTilt.current.tiltZ, targetZ, lerpFactor);
 
@@ -63,9 +55,6 @@ const Controller: React.FC<ControllerProps> = ({ gameId }) => {
     setTiltData({ tiltX: targetTilt.current.tiltX, tiltZ: targetTilt.current.tiltZ });
     socket.emit('tilt-data', { gameId, tiltX: targetTilt.current.tiltX, tiltZ: targetTilt.current.tiltZ });
   };
-
-  // Use ref to store lastUpdate since it's used in handleMotion
-  const lastUpdateRef = useRef<number>(Date.now());
 
   useEffect(() => {
     socket.connect();
@@ -83,63 +72,55 @@ const Controller: React.FC<ControllerProps> = ({ gameId }) => {
     };
   }, [gameId, socket]);
 
-  useEffect(() => {
-    const requestMotionPermission = async () => {
-      const requestPermission = (DeviceMotionEvent as any).requestPermission;
-      if (requestPermission && typeof requestPermission === 'function') {
-        try {
-          const permissionState = await requestPermission.call(DeviceMotionEvent);
-          if (permissionState === 'granted') {
-            console.log('Motion sensor permission granted');
-            setPermissionGranted(true);
-            window.addEventListener('devicemotion', handleMotion);
-          } else {
-            console.log('Motion sensor permission denied');
-          }
-        } catch (error: unknown) {
-          console.error('Permission request failed:', error);
-          setPermissionGranted(false);
-          window.addEventListener('devicemotion', handleMotion); // Fallback for non-iOS
-        }
-      } else {
-        console.log('Permission request not supported, adding listener directly');
-        setPermissionGranted(true);
-        window.addEventListener('devicemotion', handleMotion);
-      }
-    };
-
-    requestMotionPermission();
-
-    return () => {
-      console.log('Removing devicemotion listener');
-      window.removeEventListener('devicemotion', handleMotion);
-    };
-  }, [gameId, socket, handleMotion]);
-
-  const handleRequestPermission = () => {
+  const requestMotionPermission = () => {
+    setPermissionStatus('Requesting...');
     const requestPermission = (DeviceMotionEvent as any).requestPermission;
-    if (requestPermission && typeof requestPermission === 'function' && !permissionGranted) {
+    if (requestPermission && typeof requestPermission === 'function') {
       requestPermission.call(DeviceMotionEvent)
         .then((permissionState: string) => {
           if (permissionState === 'granted') {
-            console.log('Motion sensor permission granted via button');
-            setPermissionGranted(true);
+            console.log('Motion sensor permission granted');
+            setPermissionStatus('Granted');
             window.addEventListener('devicemotion', handleMotion);
           } else {
-            console.log('Motion sensor permission denied via button');
+            console.log('Motion sensor permission denied');
+            setPermissionStatus('Denied');
           }
         })
         .catch((error: unknown) => {
-          console.error('Permission request failed via button:', error);
-          setPermissionGranted(false);
-          window.addEventListener('devicemotion', handleMotion); // Fallback
+          console.error('Permission request failed:', error);
+          setPermissionStatus('Failed');
+          // Fallback for non-iOS or failed request
+          if (navigator.permissions) {
+            navigator.permissions.query({ name: 'accelerometer' }).then((permissionStatus) => {
+              if (permissionStatus.state === 'granted') {
+                console.log('Accelerometer permission already granted via settings');
+                setPermissionStatus('Granted');
+                window.addEventListener('devicemotion', handleMotion);
+              } else {
+                setPermissionStatus('Blocked - Enable in Browser Settings');
+                console.log('Motion sensors blocked, please enable in browser settings');
+              }
+            });
+          } else {
+            setPermissionStatus('Blocked - Enable in Browser Settings');
+            console.log('Permissions API not supported, enable in browser settings');
+            window.addEventListener('devicemotion', handleMotion); // Last resort
+          }
         });
-    } else if (!permissionGranted) {
-      console.log('Permission request not supported or already granted, adding listener directly');
-      setPermissionGranted(true);
+    } else {
+      setPermissionStatus('Granted (No Prompt Needed)');
+      console.log('Permission request not supported, adding listener directly');
       window.addEventListener('devicemotion', handleMotion);
     }
   };
+
+  useEffect(() => {
+    requestMotionPermission();
+    return () => {
+      window.removeEventListener('devicemotion', handleMotion);
+    };
+  }, [gameId, socket]);
 
   return (
     <div
@@ -159,10 +140,10 @@ const Controller: React.FC<ControllerProps> = ({ gameId }) => {
       <p>Status: {connectionStatus}</p>
       <p>Game ID: {gameId}</p>
       <p>Tilt: X={tiltData.tiltX.toFixed(2)}, Z={tiltData.tiltZ.toFixed(2)}</p>
-      <p>Tilt your phone to control the maze!</p>
-      {!permissionGranted && (
+      <p>Permission Status: {permissionStatus}</p>
+      {permissionStatus === 'Not Requested' || permissionStatus === 'Denied' || permissionStatus === 'Failed' || permissionStatus === 'Blocked - Enable in Browser Settings' ? (
         <button
-          onClick={handleRequestPermission}
+          onClick={requestMotionPermission}
           style={{
             marginTop: '10px',
             padding: '10px 20px',
@@ -176,7 +157,7 @@ const Controller: React.FC<ControllerProps> = ({ gameId }) => {
         >
           Grant Motion Sensor Permission
         </button>
-      )}
+      ) : null}
     </div>
   );
 };
