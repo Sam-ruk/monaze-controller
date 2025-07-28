@@ -58,14 +58,14 @@ const Controller: React.FC<ControllerProps> = ({ gameId }) => {
         const filteredY = lastTilt.current.tiltZ * 0.7 + rawY * 0.3;
 
         // Smooth transition with lower thresholds for smaller tilts
-        if (filteredX > 1) { // Left tilt (A)
+        if (filteredX > 1) { // Left tilt
           targetX = -0.5;
-        } else if (filteredX < -1) { // Right tilt (D)
+        } else if (filteredX < -1) { // Right tilt
           targetX = 0.5;
         }
-        if (filteredY < -0.5) { // Forward tilt (W)
+        if (filteredY < -0.5) { // Forward tilt
           targetZ = -0.5;
-        } else if (filteredY > 1) { // Backward tilt (S)
+        } else if (filteredY > 1) { // Backward tilt
           targetZ = 0.5;
         }
       }
@@ -80,8 +80,23 @@ const Controller: React.FC<ControllerProps> = ({ gameId }) => {
       socket.emit('tilt-data', { gameId, tiltX: targetTilt.current.tiltX, tiltZ: targetTilt.current.tiltZ });
     };
 
-    console.log('Adding devicemotion listener');
-    window.addEventListener('devicemotion', handleMotion);
+    // Request permission for motion sensors
+    if (typeof DeviceMotionEvent.requestPermission === 'function') {
+      DeviceMotionEvent.requestPermission()
+        .then(permissionState => {
+          if (permissionState === 'granted') {
+            console.log('Motion sensor permission granted');
+            window.addEventListener('devicemotion', handleMotion);
+          } else {
+            console.log('Motion sensor permission denied');
+          }
+        })
+        .catch(console.error);
+    } else {
+      console.log('Requesting permission not supported, adding listener directly');
+      window.addEventListener('devicemotion', handleMotion);
+    }
+
     return () => {
       console.log('Removing devicemotion listener');
       window.removeEventListener('devicemotion', handleMotion);
@@ -106,7 +121,7 @@ const Controller: React.FC<ControllerProps> = ({ gameId }) => {
       <p>Status: {connectionStatus}</p>
       <p>Game ID: {gameId}</p>
       <p>Tilt: X={tiltData.tiltX.toFixed(2)}, Z={tiltData.tiltZ.toFixed(2)}</p>
-      <p>Tilt your phone to control the maze! (A: Left, D: Right, W: Forward, S: Backward)</p>
+      <p>Tilt your phone to control the maze!</p>
     </div>
   );
 };
