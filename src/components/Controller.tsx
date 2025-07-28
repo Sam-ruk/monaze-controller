@@ -18,6 +18,11 @@ interface DeviceMotionEventWithPermission extends DeviceMotionEvent {
   requestPermission?: () => Promise<'granted' | 'denied'>;
 }
 
+// Type guard to check if DeviceMotionEvent has requestPermission
+const hasRequestPermission = (obj: any): obj is DeviceMotionEventWithPermission => {
+  return 'requestPermission' in obj && typeof obj.requestPermission === 'function';
+};
+
 const Controller: React.FC<ControllerProps> = ({ gameId }) => {
   const socket = useContext(SocketContext);
   const [connectionStatus, setConnectionStatus] = useState<string>('Disconnected');
@@ -45,11 +50,10 @@ const Controller: React.FC<ControllerProps> = ({ gameId }) => {
     const requestMotionPermission = async () => {
       if (
         typeof DeviceMotionEvent !== 'undefined' &&
-        'requestPermission' in DeviceMotionEvent &&
-        typeof (DeviceMotionEvent as DeviceMotionEventWithPermission).requestPermission === 'function'
+        hasRequestPermission(DeviceMotionEvent)
       ) {
         try {
-          const permission = await (DeviceMotionEvent as DeviceMotionEventWithPermission).requestPermission!();
+          const permission = await DeviceMotionEvent.requestPermission!();
           if (permission === 'granted') {
             setConnectionStatus('Connected (Motion permission granted)');
             window.addEventListener('devicemotion', handleMotion);
@@ -94,17 +98,17 @@ const Controller: React.FC<ControllerProps> = ({ gameId }) => {
         // Smooth transition with lower thresholds for smaller tilts
         if (filteredX > 1) {
           // Left tilt (A)
-          targetX = -0.5;
+          targetX = -0.35;
         } else if (filteredX < -1) {
           // Right tilt (D)
-          targetX = 0.5;
+          targetX = 0.35;
         }
         if (filteredY < -0.5) {
           // Forward tilt (W)
-          targetZ = -0.5;
+          targetZ = -0.35;
         } else if (filteredY > 1) {
           // Backward tilt (S)
-          targetZ = 0.5;
+          targetZ = 0.35;
         }
       }
 
