@@ -29,16 +29,34 @@ const Controller: React.FC<ControllerProps> = ({ gameId }) => {
 
   useEffect(() => {
     const handleMotion = (event: DeviceMotionEvent) => {
-      console.log('Motion data:', {
-        x: event.accelerationIncludingGravity?.x,
-        y: event.accelerationIncludingGravity?.y,
-        z: event.accelerationIncludingGravity?.z
-      });
-      const x = (event.accelerationIncludingGravity?.x ?? 0) / 9.81; // Normalize to ~[-1, 1]
-      const z = (event.accelerationIncludingGravity?.y ?? 0) / 9.81; // Using y for Z tilt (adjust axes as needed)
-      const maxTilt = 1;
-      const tiltX = Math.max(-0.5, Math.min(0.5, x / maxTilt * 0.5));
-      const tiltZ = Math.max(-0.5, Math.min(0.5, z / maxTilt * 0.5));
+      const rawX = event.accelerationIncludingGravity?.x ?? 0;
+      const rawY = event.accelerationIncludingGravity?.y ?? 0;
+      const rawZ = event.accelerationIncludingGravity?.z ?? 0;
+      console.log('Raw motion data:', { x: rawX, y: rawY, z: rawZ });
+
+      let tiltX = 0, tiltZ = 0;
+
+      // Dead zone to prevent drift when flat (approx. ±1 m/s²)
+      if (Math.abs(rawX) < 1 && Math.abs(rawY) < 1 && Math.abs(rawZ - 9.81) < 1) {
+        tiltX = 0;
+        tiltZ = 0;
+      } else {
+        // Map based on your observed thresholds
+        if (rawX > 2 && Math.abs(rawY) < 1 && rawZ > 0) { // Left tilt (X > 0.2 scaled to ~2 m/s²)
+          tiltX = -0.5; // Move left
+          tiltZ = 0;
+        } else if (rawX < -2 && Math.abs(rawY) < 1 && rawZ > 0) { // Right tilt (X < -0.2 scaled to ~-2 m/s²)
+          tiltX = 0.5; // Move right
+          tiltZ = 0;
+        } else if (rawY < -1 && Math.abs(rawX) < 2) { // Forward tilt (Z < -0.1 scaled to ~-1 m/s²)
+          tiltX = 0;
+          tiltZ = -0.5; // Move away
+        } else if (rawY > 2 && Math.abs(rawX) < 2) { // Backward tilt (Z > 0.2 scaled to ~2 m/s²)
+          tiltX = 0;
+          tiltZ = 0.5; // Move toward you
+        }
+      }
+
       setTiltData({ tiltX, tiltZ });
       socket.emit('tilt-data', { gameId, tiltX, tiltZ });
     };
