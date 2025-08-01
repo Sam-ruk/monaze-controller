@@ -80,18 +80,19 @@ const Controller: React.FC<ControllerProps> = ({ playerId: propPlayerId }) => {
   }, []);
 
   const connectToGame = useCallback(() => {
-    if (!socket || connectionAttempts.current >= 3) return;
-    
-    connectionAttempts.current++;
+  if (!socket || connectionAttempts.current >= 3) return;
+  
+  connectionAttempts.current++;
+  
+  if (!socket.connected) {
     socket.connect();
-    
-    socket.emit('join-player', {
-      playerId: playerId.current,
-      deviceType: 'controller',
-    });
-
-    socket.emit('multisynq-join', playerId.current);
-  }, [socket]);
+  }
+  
+  socket.emit('join-player', {
+    playerId: playerId.current,
+    deviceType: 'controller',
+  });
+}, [socket]);
 
   useEffect(() => {
     if (!socket) return;
