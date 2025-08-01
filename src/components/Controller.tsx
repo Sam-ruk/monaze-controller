@@ -4,7 +4,6 @@ import { SocketContext } from '@/contexts/SocketContext';
 
 interface ControllerProps {
   playerId?: string;
-  gameId: string;
 }
 
 interface TiltData {
@@ -12,14 +11,12 @@ interface TiltData {
   tiltZ: number;
 }
 
-const Controller: React.FC<ControllerProps> = ({ playerId: propPlayerId, gameId }) => {
+const Controller: React.FC<ControllerProps> = ({ playerId: propPlayerId }) => {
   const socket = useContext(SocketContext);
   const [connectionStatus, setConnectionStatus] = useState<string>('Disconnected');
   const [tiltData, setTiltData] = useState<TiltData>({ tiltX: 0, tiltZ: 0 });
   const [permissionStatus, setPermissionStatus] = useState<string>('unknown');
-  const [gamePhase, setGamePhase] = useState<string>('joining');
   const [isCalibrating, setIsCalibrating] = useState<boolean>(false);
-  const [totalPlayers, setTotalPlayers] = useState<number>(0);
   
   const lastTilt = useRef<TiltData>({ tiltX: 0, tiltZ: 0 });
   const targetTilt = useRef<TiltData>({ tiltX: 0, tiltZ: 0 });
@@ -70,20 +67,16 @@ const Controller: React.FC<ControllerProps> = ({ playerId: propPlayerId, gameId 
     window.addEventListener('devicemotion', calibrationHandler);
   }, []);
 
-  const connectToGame = useCallback(() => {
+  const connectToSocket = useCallback(() => {
     if (!socket || connectionAttempts.current >= 3) return;
     
     connectionAttempts.current++;
     socket.connect();
     
-    socket.emit('join-game', {
+    socket.emit('join-controller', {
       playerId: playerId.current,
-      deviceType: 'controller',
-      gameId: gameId
     });
-
-    socket.emit('multisynq-join', playerId.current);
-  }, [socket, gameId]);
+  }, [socket]);
 
   useEffect(() => {
     if (!socket) return;
@@ -91,41 +84,19 @@ const Controller: React.FC<ControllerProps> = ({ playerId: propPlayerId, gameId 
     const handleConnect = () => {
       setConnectionStatus('Connected');
       connectionAttempts.current = 0;
-      connectToGame();
+      connectToSocket();
     };
 
     const handleDisconnect = (reason: string) => {
       setConnectionStatus(`Disconnected: ${reason}`);
       if (reason === 'io server disconnect') {
-        setTimeout(connectToGame, 1000);
+        setTimeout(connectToSocket, 1000);
       }
     };
 
-    const handleJoinedGame = (data: { playerId: string; message: string; gameId: string }) => {
-      if (data.gameId === gameId) {
+    const handleControllerJoined = (data: { playerId: string; message: string }) => {
+      if (data.playerId === playerId.current) {
         setConnectionStatus(`Joined: ${data.playerId.slice(-4)}`);
-      }
-    };
-
-    const handlePlayerConnected = (data: { playerId: string; deviceType: string; totalPlayers: number }) => {
-      setTotalPlayers(data.totalPlayers);
-    };
-
-    const handlePlayerDisconnected = (data: { playerId: string; totalPlayers: number }) => {
-      setTotalPlayers(data.totalPlayers);
-    };
-
-    const handleGamePhase = (data: { phase: string; timeLeft: number; gameId: string }) => {
-      if (data.gameId === gameId) {
-        setGamePhase(data.phase);
-      }
-    };
-
-    const handleGameReset = (data: { gameId: string }) => {
-      if (data.gameId === gameId) {
-        setTiltData({ tiltX: 0, tiltZ: 0 });
-        lastTilt.current = { tiltX: 0, tiltZ: 0 };
-        targetTilt.current = { tiltX: 0, tiltZ: 0 };
       }
     };
 
@@ -133,45 +104,28 @@ const Controller: React.FC<ControllerProps> = ({ playerId: propPlayerId, gameId 
       setConnectionStatus(`Error: ${error.message}`);
     };
 
-    const handleMultisynqReady = (data: { success: boolean; playerId: string }) => {
-      if (data.playerId === playerId.current && data.success) {
-        console.log('Multisynq connection established');
-      }
-    };
-
     socket.on('connect', handleConnect);
     socket.on('disconnect', handleDisconnect);
-    socket.on('joined-game', handleJoinedGame);
-    socket.on('player-connected', handlePlayerConnected);
-    socket.on('player-disconnected', handlePlayerDisconnected);
-    socket.on('game-phase', handleGamePhase);
-    socket.on('game-reset', handleGameReset);
+    socket.on('controller-joined', handleControllerJoined);
     socket.on('connection-error', handleConnectionError);
-    socket.on('multisynq-ready', handleMultisynqReady);
 
     return () => {
       socket.off('connect', handleConnect);
       socket.off('disconnect', handleDisconnect);
-      socket.off('joined-game', handleJoinedGame);
-      socket.off('player-connected', handlePlayerConnected);
-      socket.off('player-disconnected', handlePlayerDisconnected);
-      socket.off('game-phase', handleGamePhase);
-      socket.off('game-reset', handleGameReset);
+      socket.off('controller-joined', handleControllerJoined);
       socket.off('connection-error', handleConnectionError);
-      socket.off('multisynq-ready', handleMultisynqReady);
     };
-  }, [socket, gameId, connectToGame]);
+  }, [socket, connectToSocket]);
 
   useEffect(() => {
     const handleMotion = (event: DeviceMotionEvent) => {
       const now = Date.now();
-      if (now - lastSentTime.current < 33) return;
+      if (now - lastSentTime.current < 33) return; // ~30fps
       
       if (!event.accelerationIncludingGravity) return;
 
       const rawX = (event.accelerationIncludingGravity.x || 0) - calibrationRef.current.x;
       const rawY = (event.accelerationIncludingGravity.y || 0) - calibrationRef.current.y;
-      const rawZ = (event.accelerationIncludingGravity.z || 0) - calibrationRef.current.z;
 
       let targetX = 0;
       let targetZ = 0;
@@ -197,7 +151,7 @@ const Controller: React.FC<ControllerProps> = ({ playerId: propPlayerId, gameId 
       lastTilt.current = { ...targetTilt.current };
       setTiltData({ ...targetTilt.current });
 
-      if (gamePhase === 'playing' && socket && socket.connected) {
+      if (socket && socket.connected) {
         lastSentTime.current = now;
         socket.emit('tilt-data', {
           playerId: playerId.current,
@@ -214,18 +168,18 @@ const Controller: React.FC<ControllerProps> = ({ playerId: propPlayerId, gameId 
         window.removeEventListener('devicemotion', handleMotion);
       };
     }
-  }, [socket, permissionStatus, gamePhase]);
+  }, [socket, permissionStatus]);
 
   useEffect(() => {
     requestMotionPermission();
-    connectToGame();
+    connectToSocket();
 
     return () => {
       if (socket && socket.connected) {
         socket.disconnect();
       }
     };
-  }, [connectToGame]);
+  }, [connectToSocket]);
 
   const getStatusColor = () => {
     if (connectionStatus.includes('Connected') || connectionStatus.includes('Joined')) {
@@ -236,19 +190,6 @@ const Controller: React.FC<ControllerProps> = ({ playerId: propPlayerId, gameId 
       return '#ff8800';
     }
     return '#ffff00';
-  };
-
-  const getGamePhaseMessage = () => {
-    switch (gamePhase) {
-      case 'joining':
-        return `⏳ Waiting for game to start... (${totalPlayers} players)`;
-      case 'playing':
-        return '🎮 Game is live! Tilt to control your ball!';
-      case 'ended':
-        return '🏁 Game finished! New game starting soon...';
-      default:
-        return '🔄 Connecting...';
-    }
   };
 
   return (
@@ -311,7 +252,7 @@ const Controller: React.FC<ControllerProps> = ({ playerId: propPlayerId, gameId 
             color: '#00f7ff',
             textShadow: '0 0 5px #00f7ff',
           }}>
-            {getGamePhaseMessage()}
+            🎮 Ready to play! Tilt to control your ball!
           </p>
         </div>
 
