@@ -5,11 +5,11 @@ import Controller from '../components/Controller';
 
 function HomeContent() {
   const searchParams = useSearchParams();
-  const gameId = searchParams.get('gameId');
+  const playerId = searchParams.get('playerId');
 
   return (
     <div>
-      {gameId ? <Controller gameId={gameId} /> : <p>Loading game...</p>}
+      {playerId ? <Controller playerId={playerId} /> : <p>Loading game...</p>}
     </div>
   );
 }
