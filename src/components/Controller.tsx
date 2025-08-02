@@ -21,25 +21,30 @@ const Controller: React.FC<ControllerProps> = ({ playerId: propPlayerId }) => {
   
   const lastTilt = useRef<TiltData>({ tiltX: 0, tiltZ: 0 });
   const targetTilt = useRef<TiltData>({ tiltX: 0, tiltZ: 0 });
-const playerId = useRef<string>(
-  propPlayerId || 
-  new URLSearchParams(window.location.search).get('id') || 
-  Math.random().toString(36).substr(2, 6).toUpperCase()
-);
+const playerId = useRef<string>('');
+
   const calibrationRef = useRef<{ x: number; y: number; z: number }>({ x: 0, y: 0, z: 0 });
   const lastSentTime = useRef<number>(0);
   const connectionAttempts = useRef<number>(0);
 
   // Get playerId from URL params if not provided
   useEffect(() => {
-    if (!propPlayerId) {
-      const urlParams = new URLSearchParams(window.location.search);
-      const urlPlayerId = urlParams.get('playerId');
-      if (urlPlayerId) {
-        playerId.current = urlPlayerId;
-      }
-    }
-  }, [propPlayerId]);
+  // Get playerId from URL path like /ABCD12 or query param
+  const pathId = window.location.pathname.split('/').pop();
+  const queryId = new URLSearchParams(window.location.search).get('playerId') || 
+                  new URLSearchParams(window.location.search).get('id');
+  
+  if (propPlayerId) {
+    playerId.current = propPlayerId;
+  } else if (pathId && pathId.length >= 4 && pathId !== '') {
+    playerId.current = pathId.toUpperCase();
+  } else if (queryId) {
+    playerId.current = queryId.toUpperCase();
+  } else {
+    // Generate new 6-char ID
+    playerId.current = crypto.randomUUID().slice(-6).toUpperCase();
+  }
+}, [propPlayerId]);
 
   const lerp = (start: number, end: number, factor: number): number => {
     return start + (end - start) * factor;
@@ -161,7 +166,7 @@ const playerId = useRef<string>(
   useEffect(() => {
   const handleMotion = (event: DeviceMotionEvent) => {
     const now = Date.now();
-    if (now - lastSentTime.current < 33) return; // ~30fps
+    if (now - lastSentTime.current < 50) return; // Reduce to ~20fps instead of 30fps
     
     if (!event.accelerationIncludingGravity) return;
 
@@ -171,29 +176,29 @@ const playerId = useRef<string>(
     let targetX = 0;
     let targetZ = 0;
 
-    const threshold = 0.3;
+    const threshold = 0.2; // Lower threshold for better sensitivity
     const maxTilt = 1.0;
 
     if (Math.abs(rawX) > threshold) {
-      targetX = Math.max(-maxTilt, Math.min(maxTilt, rawX * 0.4));
+      targetX = Math.max(-maxTilt, Math.min(maxTilt, rawX * 0.5)); // Increase sensitivity
     }
 
     if (Math.abs(rawY) > threshold) {
-      targetZ = Math.max(-maxTilt, Math.min(maxTilt, -rawY * 0.4));
+      targetZ = Math.max(-maxTilt, Math.min(maxTilt, -rawY * 0.5)); // Increase sensitivity
     }
 
-    const lerpFactor = 0.2;
+    const lerpFactor = 0.3; // Increase responsiveness
     targetTilt.current.tiltX = lerp(targetTilt.current.tiltX, targetX, lerpFactor);
     targetTilt.current.tiltZ = lerp(targetTilt.current.tiltZ, targetZ, lerpFactor);
 
-    if (Math.abs(targetTilt.current.tiltX) < 0.03) targetTilt.current.tiltX = 0;
-    if (Math.abs(targetTilt.current.tiltZ) < 0.03) targetTilt.current.tiltZ = 0;
+    if (Math.abs(targetTilt.current.tiltX) < 0.02) targetTilt.current.tiltX = 0;
+    if (Math.abs(targetTilt.current.tiltZ) < 0.02) targetTilt.current.tiltZ = 0;
 
     lastTilt.current = { ...targetTilt.current };
     setTiltData({ ...targetTilt.current });
 
-    // Only send tilt data if connected and values are significant
-    if (socket && socket.connected && (Math.abs(targetTilt.current.tiltX) > 0.01 || Math.abs(targetTilt.current.tiltZ) > 0.01)) {
+    // Send tilt data more frequently and always send (even zeros for stopping)
+    if (socket && socket.connected) {
       lastSentTime.current = now;
       socket.emit('tilt-data', {
         playerId: playerId.current,
@@ -289,14 +294,10 @@ const playerId = useRef<string>(
     fontSize: '1.1em',
     textShadow: `0 0 5px ${getStatusColor()}`,
   }}>
-    {getStatusMessage()} {/* Use the function here instead of just connectionStatus */}
+    {getStatusMessage()}
   </p>
   <p style={{ color: '#cc99ff', fontSize: '0.9em', marginTop: '5px' }}>
-    {/* Update this line to show pairing status */}
-    {new URLSearchParams(window.location.search).get('playerId') || window.location.pathname.includes('/') ? 
-      `Paired with: ${playerId.current.slice(-4)}` : 
-      `Solo Player: ${playerId.current.slice(-4)}`
-    }
+    Player ID: {playerId.current.slice(-4)}
   </p>
 </div>
 
