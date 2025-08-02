@@ -171,18 +171,18 @@ const [playerId] = useState<string>(() => {
     let targetX = 0;
     let targetZ = 0;
 
-    const threshold = 0.2; // Lower threshold for better sensitivity
-    const maxTilt = 1.0;
+    const threshold = 0.1; // Lower threshold for better sensitivity
+const maxTilt = 0.8; // Reduce max tilt for better control
 
-    if (Math.abs(rawX) > threshold) {
-      targetX = Math.max(-maxTilt, Math.min(maxTilt, rawX * 0.5)); // Increase sensitivity
-    }
+if (Math.abs(rawX) > threshold) {
+  targetX = Math.max(-maxTilt, Math.min(maxTilt, rawX * 0.4));
+}
 
-    if (Math.abs(rawY) > threshold) {
-      targetZ = Math.max(-maxTilt, Math.min(maxTilt, -rawY * 0.5)); // Increase sensitivity
-    }
+if (Math.abs(rawY) > threshold) {
+  targetZ = Math.max(-maxTilt, Math.min(maxTilt, -rawY * 0.4));
+}
 
-    const lerpFactor = 0.3; // Increase responsiveness
+const lerpFactor = 0.4; // Increase responsiveness
     targetTilt.current.tiltX = lerp(targetTilt.current.tiltX, targetX, lerpFactor);
     targetTilt.current.tiltZ = lerp(targetTilt.current.tiltZ, targetZ, lerpFactor);
 
@@ -192,16 +192,16 @@ const [playerId] = useState<string>(() => {
     lastTilt.current = { ...targetTilt.current };
     setTiltData({ ...targetTilt.current });
 
-    // Send tilt data more frequently and always send (even zeros for stopping)
-    if (socket && socket.connected) {
-      lastSentTime.current = now;
-      socket.emit('tilt-data', {
-        playerId: playerId,
-        tiltX: targetTilt.current.tiltX,
-        tiltZ: targetTilt.current.tiltZ,
-        timestamp: now
-      });
-    }
+    // Send tilt data - always send to maintain connection
+if (socket && socket.connected) {
+  lastSentTime.current = now;
+  socket.emit('tilt-data', {
+    playerId: playerId,
+    tiltX: targetTilt.current.tiltX,
+    tiltZ: targetTilt.current.tiltZ,
+    timestamp: now
+  });
+}
   };
 
   if (permissionStatus === 'granted') {
