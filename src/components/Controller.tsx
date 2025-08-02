@@ -88,9 +88,10 @@ const Controller: React.FC<ControllerProps> = ({ playerId: propPlayerId }) => {
     socket.connect();
   }
   
+  // Controller only joins as controller device
   socket.emit('join-player', {
     playerId: playerId.current,
-    deviceType: 'controller',
+    deviceType: 'controller', // Make sure this is explicitly 'controller'
   });
 }, [socket]);
 
@@ -154,58 +155,58 @@ const Controller: React.FC<ControllerProps> = ({ playerId: propPlayerId }) => {
   }, [socket, connectToGame]);
 
   useEffect(() => {
-    const handleMotion = (event: DeviceMotionEvent) => {
-      const now = Date.now();
-      if (now - lastSentTime.current < 33) return; // ~30fps
-      
-      if (!event.accelerationIncludingGravity) return;
+  const handleMotion = (event: DeviceMotionEvent) => {
+    const now = Date.now();
+    if (now - lastSentTime.current < 33) return; // ~30fps
+    
+    if (!event.accelerationIncludingGravity) return;
 
-      const rawX = (event.accelerationIncludingGravity.x || 0) - calibrationRef.current.x;
-      const rawY = (event.accelerationIncludingGravity.y || 0) - calibrationRef.current.y;
-      const rawZ = (event.accelerationIncludingGravity.z || 0) - calibrationRef.current.z;
+    const rawX = (event.accelerationIncludingGravity.x || 0) - calibrationRef.current.x;
+    const rawY = (event.accelerationIncludingGravity.y || 0) - calibrationRef.current.y;
 
-      let targetX = 0;
-      let targetZ = 0;
+    let targetX = 0;
+    let targetZ = 0;
 
-      const threshold = 0.3;
-      const maxTilt = 1.0;
+    const threshold = 0.3;
+    const maxTilt = 1.0;
 
-      if (Math.abs(rawX) > threshold) {
-        targetX = Math.max(-maxTilt, Math.min(maxTilt, rawX * 0.4));
-      }
-
-      if (Math.abs(rawY) > threshold) {
-        targetZ = Math.max(-maxTilt, Math.min(maxTilt, -rawY * 0.4));
-      }
-
-      const lerpFactor = 0.2;
-      targetTilt.current.tiltX = lerp(targetTilt.current.tiltX, targetX, lerpFactor);
-      targetTilt.current.tiltZ = lerp(targetTilt.current.tiltZ, targetZ, lerpFactor);
-
-      if (Math.abs(targetTilt.current.tiltX) < 0.03) targetTilt.current.tiltX = 0;
-      if (Math.abs(targetTilt.current.tiltZ) < 0.03) targetTilt.current.tiltZ = 0;
-
-      lastTilt.current = { ...targetTilt.current };
-      setTiltData({ ...targetTilt.current });
-
-      if (socket && socket.connected) {
-        lastSentTime.current = now;
-        socket.emit('tilt-data', {
-          playerId: playerId.current,
-          tiltX: targetTilt.current.tiltX,
-          tiltZ: targetTilt.current.tiltZ,
-          timestamp: now
-        });
-      }
-    };
-
-    if (permissionStatus === 'granted') {
-      window.addEventListener('devicemotion', handleMotion);
-      return () => {
-        window.removeEventListener('devicemotion', handleMotion);
-      };
+    if (Math.abs(rawX) > threshold) {
+      targetX = Math.max(-maxTilt, Math.min(maxTilt, rawX * 0.4));
     }
-  }, [socket, permissionStatus]);
+
+    if (Math.abs(rawY) > threshold) {
+      targetZ = Math.max(-maxTilt, Math.min(maxTilt, -rawY * 0.4));
+    }
+
+    const lerpFactor = 0.2;
+    targetTilt.current.tiltX = lerp(targetTilt.current.tiltX, targetX, lerpFactor);
+    targetTilt.current.tiltZ = lerp(targetTilt.current.tiltZ, targetZ, lerpFactor);
+
+    if (Math.abs(targetTilt.current.tiltX) < 0.03) targetTilt.current.tiltX = 0;
+    if (Math.abs(targetTilt.current.tiltZ) < 0.03) targetTilt.current.tiltZ = 0;
+
+    lastTilt.current = { ...targetTilt.current };
+    setTiltData({ ...targetTilt.current });
+
+    // Only send tilt data if connected and values are significant
+    if (socket && socket.connected && (Math.abs(targetTilt.current.tiltX) > 0.01 || Math.abs(targetTilt.current.tiltZ) > 0.01)) {
+      lastSentTime.current = now;
+      socket.emit('tilt-data', {
+        playerId: playerId.current,
+        tiltX: targetTilt.current.tiltX,
+        tiltZ: targetTilt.current.tiltZ,
+        timestamp: now
+      });
+    }
+  };
+
+  if (permissionStatus === 'granted') {
+    window.addEventListener('devicemotion', handleMotion);
+    return () => {
+      window.removeEventListener('devicemotion', handleMotion);
+    };
+  }
+}, [socket, permissionStatus]);
 
   useEffect(() => {
     requestMotionPermission();
@@ -228,6 +229,14 @@ const Controller: React.FC<ControllerProps> = ({ playerId: propPlayerId }) => {
     }
     return '#ffff00';
   };
+
+  const getStatusMessage = () => {
+  if (connectionStatus.includes('Joined')) {
+    return `🎮 Controller Ready (${playerId.current.slice(-4)})`;
+  }
+  return connectionStatus;
+};
+
 
   return (
     <div
@@ -269,19 +278,23 @@ const Controller: React.FC<ControllerProps> = ({ playerId: propPlayerId }) => {
         </h1>
         
         <div style={{ marginBottom: '20px' }}>
-          <h3 style={{ color: '#00f7ff', marginBottom: '10px' }}>Controller</h3>
-          <p style={{ 
-            color: getStatusColor(), 
-            fontWeight: 'bold',
-            fontSize: '1.1em',
-            textShadow: `0 0 5px ${getStatusColor()}`,
-          }}>
-            {connectionStatus}
-          </p>
-          <p style={{ color: '#cc99ff', fontSize: '0.9em', marginTop: '5px' }}>
-            Player ID: {playerId.current.slice(-4)}
-          </p>
-        </div>
+  <h3 style={{ color: '#00f7ff', marginBottom: '10px' }}>Controller</h3>
+  <p style={{ 
+    color: getStatusColor(), 
+    fontWeight: 'bold',
+    fontSize: '1.1em',
+    textShadow: `0 0 5px ${getStatusColor()}`,
+  }}>
+    {getStatusMessage()} {/* Use the function here instead of just connectionStatus */}
+  </p>
+  <p style={{ color: '#cc99ff', fontSize: '0.9em', marginTop: '5px' }}>
+    {/* Update this line to show pairing status */}
+    {new URLSearchParams(window.location.search).get('playerId') || window.location.pathname.includes('/') ? 
+      `Paired with: ${playerId.current.slice(-4)}` : 
+      `Solo Player: ${playerId.current.slice(-4)}`
+    }
+  </p>
+</div>
 
         <div style={{ marginBottom: '20px' }}>
           <p style={{ 
