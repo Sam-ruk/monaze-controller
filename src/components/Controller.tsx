@@ -41,25 +41,6 @@ const [playerId] = useState<string>(() => {
   const lastSentTime = useRef<number>(0);
   const connectionAttempts = useRef<number>(0);
 
-  // Get playerId from URL params if not provided
-  useEffect(() => {
-  // Get playerId from URL path like /ABCD12 or query param
-  const pathId = window.location.pathname.split('/').pop();
-  const queryId = new URLSearchParams(window.location.search).get('playerId') || 
-                  new URLSearchParams(window.location.search).get('id');
-  
-  if (propPlayerId) {
-    playerId.current = propPlayerId;
-  } else if (pathId && pathId.length >= 4 && pathId !== '') {
-    playerId.current = pathId.toUpperCase();
-  } else if (queryId) {
-    playerId.current = queryId.toUpperCase();
-  } else {
-    // Generate new 6-char ID
-    playerId.current = crypto.randomUUID().slice(-6).toUpperCase();
-  }
-}, [propPlayerId]);
-
   const lerp = (start: number, end: number, factor: number): number => {
     return start + (end - start) * factor;
   };
@@ -113,7 +94,7 @@ const [playerId] = useState<string>(() => {
   
   // Controller only joins as controller device
   socket.emit('join-player', {
-    playerId: playerId.current,
+    playerId: playerId,
     deviceType: 'controller', // Make sure this is explicitly 'controller'
   });
 }, [socket]);
@@ -135,7 +116,7 @@ const [playerId] = useState<string>(() => {
     };
 
     const handleJoinedPlayer = (data: { playerId: string; deviceType: string; message: string }) => {
-      if (data.playerId === playerId.current && data.deviceType === 'controller') {
+      if (data.playerId === playerId && data.deviceType === 'controller') {
         setConnectionStatus(`Joined: ${data.playerId.slice(-4)}`);
       }
     };
@@ -153,7 +134,7 @@ const [playerId] = useState<string>(() => {
     };
 
     const handleMultisynqReady = (data: { success: boolean; playerId: string }) => {
-      if (data.playerId === playerId.current && data.success) {
+      if (data.playerId === playerId && data.success) {
         console.log('Multisynq connection established');
       }
     };
@@ -215,7 +196,7 @@ const [playerId] = useState<string>(() => {
     if (socket && socket.connected) {
       lastSentTime.current = now;
       socket.emit('tilt-data', {
-        playerId: playerId.current,
+        playerId: playerId,
         tiltX: targetTilt.current.tiltX,
         tiltZ: targetTilt.current.tiltZ,
         timestamp: now
@@ -255,7 +236,7 @@ const [playerId] = useState<string>(() => {
 
   const getStatusMessage = () => {
   if (connectionStatus.includes('Joined')) {
-    return `🎮 Controller Ready (${playerId.current.slice(-4)})`;
+    return `🎮 Controller Ready (${playerId.slice(-4)})`;
   }
   return connectionStatus;
 };
@@ -311,7 +292,7 @@ const [playerId] = useState<string>(() => {
     {getStatusMessage()}
   </p>
   <p style={{ color: '#cc99ff', fontSize: '0.9em', marginTop: '5px' }}>
-    Player ID: {playerId.current.slice(-4)}
+    Player ID: {playerId.slice(-4)}
   </p>
 </div>
 
