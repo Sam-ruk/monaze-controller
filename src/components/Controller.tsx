@@ -21,7 +21,11 @@ const Controller: React.FC<ControllerProps> = ({ playerId: propPlayerId }) => {
   
   const lastTilt = useRef<TiltData>({ tiltX: 0, tiltZ: 0 });
   const targetTilt = useRef<TiltData>({ tiltX: 0, tiltZ: 0 });
-  const playerId = useRef<string>(propPlayerId || crypto.randomUUID());
+const playerId = useRef<string>(
+  propPlayerId || 
+  new URLSearchParams(window.location.search).get('id') || 
+  Math.random().toString(36).substr(2, 6).toUpperCase()
+);
   const calibrationRef = useRef<{ x: number; y: number; z: number }>({ x: 0, y: 0, z: 0 });
   const lastSentTime = useRef<number>(0);
   const connectionAttempts = useRef<number>(0);
