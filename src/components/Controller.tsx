@@ -21,7 +21,21 @@ const Controller: React.FC<ControllerProps> = ({ playerId: propPlayerId }) => {
   
   const lastTilt = useRef<TiltData>({ tiltX: 0, tiltZ: 0 });
   const targetTilt = useRef<TiltData>({ tiltX: 0, tiltZ: 0 });
-const playerId = useRef<string>('');
+const [playerId] = useState<string>(() => {
+  if (typeof window !== 'undefined') {
+    // Get from prop first
+    if (propPlayerId) return propPlayerId.toUpperCase();
+    
+    // Get from URL query params
+    const urlParams = new URLSearchParams(window.location.search);
+    const queryId = urlParams.get('id') || urlParams.get('playerId');
+    
+    if (queryId) return queryId.toUpperCase();
+  }
+  
+  // Generate new 6-char ID if nothing found
+  return crypto.randomUUID().slice(-6).toUpperCase();
+});
 
   const calibrationRef = useRef<{ x: number; y: number; z: number }>({ x: 0, y: 0, z: 0 });
   const lastSentTime = useRef<number>(0);
