@@ -95,10 +95,10 @@ const [playerId] = useState<string>(() => {
   // Controller only joins as controller device
   socket.emit('join-player', {
     playerId: playerId,
-    deviceType: 'controller', // Make sure this is explicitly 'controller'
+    deviceType: 'controller',
   });
-}, [socket]);
-
+}, [socket, playerId]); 
+  
   useEffect(() => {
     if (!socket) return;
 
@@ -116,14 +116,19 @@ const [playerId] = useState<string>(() => {
     };
 
     const handleJoinedPlayer = (data: { playerId: string; deviceType: string; message: string }) => {
-      if (data.playerId === playerId && data.deviceType === 'controller') {
-        setConnectionStatus(`Joined: ${data.playerId.slice(-4)}`);
-      }
-    };
+  if (data.playerId === playerId && data.deviceType === 'controller') {
+    setConnectionStatus(`Controller Ready (${data.playerId.slice(-4)})`);
+  }
+};
 
     const handlePlayerConnected = (data: { playerId: string; deviceType: string; totalPlayers: number; hasController: boolean; hasDisplay: boolean }) => {
-      setTotalPlayers(data.totalPlayers);
-    };
+  setTotalPlayers(data.totalPlayers);
+  
+  // ADD this new logic:
+  if (data.playerId === playerId && data.deviceType === 'controller') {
+    setConnectionStatus(`Controller Ready (${playerId.slice(-4)})`);
+  }
+};
 
     const handlePlayerDisconnected = (data: { playerId: string; totalPlayers: number }) => {
       setTotalPlayers(data.totalPlayers);
