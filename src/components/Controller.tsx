@@ -90,14 +90,20 @@ const [playerId] = useState<string>(() => {
   
   if (!socket.connected) {
     socket.connect();
+    
+    socket.once('connect', () => {
+      socket.emit('join-player', {
+        playerId: playerId,
+        deviceType: 'controller',
+      });
+    });
+  } else {
+    socket.emit('join-player', {
+      playerId: playerId,
+      deviceType: 'controller',
+    });
   }
-  
-  // Controller only joins as controller device
-  socket.emit('join-player', {
-    playerId: playerId,
-    deviceType: 'controller',
-  });
-}, [socket, playerId]); 
+}, [socket, playerId]);
   
   useEffect(() => {
     if (!socket) return;
