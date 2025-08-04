@@ -4,8 +4,8 @@ import ClientWrapper from '@/components/ClientWrapper';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Neon Maze Controller',
-  description: 'Phone controller for Neon Maze game',
+  title: 'Monaze Controller',
+  description: '3D Maze game controlled using phone.',
 };
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
