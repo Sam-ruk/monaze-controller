@@ -44,6 +44,7 @@ const Controller: React.FC<ControllerProps> = ({ playerId: propPlayerId }) => {
       socket.connect();
     }
     socket.emit('join', { playerId });
+    socket.emit('get-players', { playerId });
   };
 
   useEffect(() => {
