@@ -34,7 +34,7 @@ const Controller: React.FC<ControllerProps> = ({ playerId: propPlayerId }) => {
         setPermissionStatus('error');
       }
     } else {
-      setPermissionStatus('granted'); // No permission needed (e.g., Android)
+      setPermissionStatus('granted');
     }
   };
 
@@ -47,7 +47,7 @@ const Controller: React.FC<ControllerProps> = ({ playerId: propPlayerId }) => {
   };
 
   useEffect(() => {
-    requestMotionPermission(); // Request permission on mount
+    requestMotionPermission();
     connectToGame();
 
     // Handle player list updates
@@ -79,7 +79,7 @@ const Controller: React.FC<ControllerProps> = ({ playerId: propPlayerId }) => {
       const x = Math.abs(rawX) > threshold ? Math.max(-maxTilt, Math.min(maxTilt, rawX * 0.4)) : 0;
       const z = Math.abs(rawY) > threshold ? Math.max(-maxTilt, Math.min(maxTilt, -rawY * 0.4)) : 0;
 
-      setTiltData({ x, z }); // Update state for UI display
+      setTiltData({ x, z });
 
       if (socket.connected) {
         lastSentTime.current = now;
@@ -95,24 +95,246 @@ const Controller: React.FC<ControllerProps> = ({ playerId: propPlayerId }) => {
     }
   }, [socket, permissionStatus]);
 
+  // Status color for connection indicator
+  const getStatusColor = () => {
+    return socket.connected ? '#00ff00' : '#ff4444';
+  };
+
   return (
-    <div>
-      <h1>MONAZE</h1>
-      <h3>Controller</h3>
-      <p>Player ID: {playerId}</p>
-      <p>Total Players: {totalPlayers}</p>
-      {permissionStatus === 'granted' ? (
-        <div>
-          <h4>Tilt Data</h4>
-          <p>Left/Right: {tiltData.x.toFixed(2)}</p>
-          <p>Forward/Back: {tiltData.z.toFixed(2)}</p>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100vh',
+        background: 'linear-gradient(135deg, #1a0033 0%, #330066 50%, #1a0033 100%)',
+        color: '#d400ff',
+        fontFamily: 'Orbitron, monospace',
+        textAlign: 'center',
+        padding: '20px',
+        overflow: 'hidden',
+      }}
+    >
+      <div
+        style={{
+          background: 'rgba(212, 0, 255, 0.1)',
+          border: '2px solid #d400ff',
+          borderRadius: '15px',
+          padding: '30px',
+          backdropFilter: 'blur(10px)',
+          boxShadow: '0 0 30px rgba(212, 0, 255, 0.3)',
+          maxWidth: '400px',
+          width: '100%',
+        }}
+      >
+        <h1
+          style={{
+            fontSize: '2.5em',
+            margin: '0 0 20px 0',
+            textShadow: '0 0 10px #d400ff',
+            background: 'linear-gradient(45deg, #d400ff, #00f7ff)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+          }}
+        >
+          🌌 MONAZE
+        </h1>
+
+        <div style={{ marginBottom: '20px' }}>
+          <h3 style={{ color: '#00f7ff', marginBottom: '10px' }}>Controller</h3>
+          <p
+            style={{
+              color: getStatusColor(),
+              fontWeight: 'bold',
+              fontSize: '1.1em',
+              textShadow: `0 0 5px ${getStatusColor()}`,
+            }}
+          >
+            {socket.connected ? `🎮 Controller Ready (${playerId.slice(-4)})` : 'Disconnected'}
+          </p>
+          <p style={{ color: '#cc99ff', fontSize: '0.9em', marginTop: '5px' }}>
+            Player ID: {playerId.slice(-4)}
+          </p>
         </div>
-      ) : (
-        <div>
-          <p>Permission: {permissionStatus}</p>
-          {permissionStatus !== 'error' && (
-            <button onClick={requestMotionPermission}>Request Motion Permission</button>
-          )}
+
+        <div style={{ marginBottom: '20px' }}>
+          <p
+            style={{
+              fontSize: '1.2em',
+              color: '#00f7ff',
+              textShadow: '0 0 5px #00f7ff',
+            }}
+          >
+            🎮 Controller ready! ({totalPlayers} players online)
+          </p>
+        </div>
+
+        <div style={{ marginBottom: '20px' }}>
+          <h4 style={{ color: '#cc99ff', marginBottom: '10px' }}>Motion Permission</h4>
+          <p
+            style={{
+              color: permissionStatus === 'granted' ? '#00ff00' : '#ff4444',
+              fontWeight: 'bold',
+            }}
+          >
+            {permissionStatus === 'granted'
+              ? '✅ Granted'
+              : permissionStatus === 'denied'
+              ? '❌ Denied'
+              : permissionStatus === 'error'
+              ? '⚠️ Error'
+              : '⏳ Checking...'}
+          </p>
+        </div>
+
+        {permissionStatus === 'denied' && (
+          <button
+            onClick={requestMotionPermission}
+            style={{
+              padding: '12px 24px',
+              fontSize: '16px',
+              cursor: 'pointer',
+              background: 'linear-gradient(45deg, #d400ff, #ff0080)',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '25px',
+              margin: '10px',
+              boxShadow: '0 4px 15px rgba(212, 0, 255, 0.4)',
+              transition: 'all 0.3s ease',
+            }}
+            onMouseDown={(e) => {
+              e.currentTarget.style.transform = 'scale(0.95)';
+            }}
+            onMouseUp={(e) => {
+              e.currentTarget.style.transform = 'scale(1)';
+            }}
+          >
+            Request Permission
+          </button>
+        )}
+
+        {permissionStatus === 'granted' && (
+          <div
+            style={{
+              marginTop: '20px',
+              padding: '15px',
+              background: 'rgba(0, 247, 255, 0.1)',
+              border: '1px solid #00f7ff',
+              borderRadius: '10px',
+            }}
+          >
+            <h4 style={{ color: '#00f7ff', marginBottom: '10px' }}>Tilt Data</h4>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '10px',
+                fontSize: '0.9em',
+              }}
+            >
+              <div>
+                <span style={{ color: '#cc99ff' }}>Left/Right:</span>
+                <br />
+                <span
+                  style={{
+                    color: Math.abs(tiltData.x) > 0.1 ? '#00ff00' : '#666',
+                    fontWeight: 'bold',
+                  }}
+                >
+                  {tiltData.x.toFixed(2)}
+                </span>
+              </div>
+              <div>
+                <span style={{ color: '#cc99ff' }}>Forward/Back:</span>
+                <br />
+                <span
+                  style={{
+                    color: Math.abs(tiltData.z) > 0.1 ? '#00ff00' : '#666',
+                    fontWeight: 'bold',
+                  }}
+                >
+                  {tiltData.z.toFixed(2)}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {permissionStatus === 'error' && (
+          <div
+            style={{
+              color: '#ff4444',
+              fontSize: '0.9em',
+              padding: '10px',
+              background: 'rgba(255, 68, 68, 0.1)',
+              border: '1px solid #ff4444',
+              borderRadius: '8px',
+              marginTop: '10px',
+            }}
+          >
+            ⚠️ Error accessing motion sensors.<br />
+            Please check your browser settings and ensure you are using HTTPS.
+          </div>
+        )}
+
+        <div
+          style={{
+            marginTop: '25px',
+            fontSize: '0.85em',
+            color: '#cc99ff',
+            lineHeight: '1.4',
+          }}
+        >
+          💡 <strong>How to play:</strong>
+          <br />
+          Tilt your phone to control your glowing ball through the neon maze!
+          <br />
+          Reach the white goal to finish!
+        </div>
+      </div>
+
+      {permissionStatus === 'granted' && (
+        <div
+          style={{
+            position: 'absolute',
+            bottom: '30px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: '100px',
+            height: '100px',
+            border: '3px solid #d400ff',
+            borderRadius: '50%',
+            background: 'rgba(212, 0, 255, 0.1)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 0 20px rgba(212, 0, 255, 0.3)',
+          }}
+        >
+          <div
+            style={{
+              position: 'absolute',
+              top: '-5px',
+              right: '-5px',
+              width: '15px',
+              height: '15px',
+              borderRadius: '50%',
+              background: getStatusColor(),
+              boxShadow: `0 0 10px ${getStatusColor()}`,
+            }}
+          />
+          <div
+            style={{
+              width: '25px',
+              height: '25px',
+              background: 'linear-gradient(45deg, #00f7ff, #d400ff)',
+              borderRadius: '50%',
+              transform: `translate(${tiltData.x * 30}px, ${tiltData.z * 30}px)`,
+              transition: 'transform 0.05s ease',
+              boxShadow: '0 0 15px rgba(0, 247, 255, 0.8)',
+            }}
+          />
         </div>
       )}
     </div>
