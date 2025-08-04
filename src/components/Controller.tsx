@@ -138,7 +138,7 @@ const Controller: React.FC<ControllerProps> = ({ playerId: propPlayerId }) => {
             WebkitTextFillColor: 'transparent',
           }}
         >
-          🌌 MONAZE
+          MONAZE
         </h1>
 
         <div style={{ marginBottom: '20px' }}>
@@ -156,9 +156,6 @@ const Controller: React.FC<ControllerProps> = ({ playerId: propPlayerId }) => {
           <p style={{ color: '#cc99ff', fontSize: '0.9em', marginTop: '5px' }}>
             Player ID: {playerId.slice(-4)}
           </p>
-        </div>
-
-        <div style={{ marginBottom: '20px' }}>
           <p
             style={{
               fontSize: '1.2em',
@@ -166,7 +163,7 @@ const Controller: React.FC<ControllerProps> = ({ playerId: propPlayerId }) => {
               textShadow: '0 0 5px #00f7ff',
             }}
           >
-            🎮 Controller ready! ({totalPlayers} players online)
+            Players Online: {totalPlayers}
           </p>
         </div>
 
@@ -277,66 +274,7 @@ const Controller: React.FC<ControllerProps> = ({ playerId: propPlayerId }) => {
             Please check your browser settings and ensure you are using HTTPS.
           </div>
         )}
-
-        <div
-          style={{
-            marginTop: '25px',
-            fontSize: '0.85em',
-            color: '#cc99ff',
-            lineHeight: '1.4',
-          }}
-        >
-          💡 <strong>How to play:</strong>
-          <br />
-          Tilt your phone to control your glowing ball through the neon maze!
-          <br />
-          Reach the white goal to finish!
-        </div>
       </div>
-
-      {permissionStatus === 'granted' && (
-        <div
-          style={{
-            position: 'absolute',
-            bottom: '30px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            width: '100px',
-            height: '100px',
-            border: '3px solid #d400ff',
-            borderRadius: '50%',
-            background: 'rgba(212, 0, 255, 0.1)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 0 20px rgba(212, 0, 255, 0.3)',
-          }}
-        >
-          <div
-            style={{
-              position: 'absolute',
-              top: '-5px',
-              right: '-5px',
-              width: '15px',
-              height: '15px',
-              borderRadius: '50%',
-              background: getStatusColor(),
-              boxShadow: `0 0 10px ${getStatusColor()}`,
-            }}
-          />
-          <div
-            style={{
-              width: '25px',
-              height: '25px',
-              background: 'linear-gradient(45deg, #00f7ff, #d400ff)',
-              borderRadius: '50%',
-              transform: `translate(${tiltData.x * 30}px, ${tiltData.z * 30}px)`,
-              transition: 'transform 0.05s ease',
-              boxShadow: '0 0 15px rgba(0, 247, 255, 0.8)',
-            }}
-          />
-        </div>
-      )}
     </div>
   );
 };
