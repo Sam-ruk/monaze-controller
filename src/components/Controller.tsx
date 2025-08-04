@@ -83,7 +83,7 @@ const Controller: React.FC<ControllerProps> = ({ playerId: propPlayerId }) => {
 
       if (socket.connected) {
         lastSentTime.current = now;
-        socket.emit('tilt', { x, z });
+        socket.emit('tilt', { playerId, x, z });
       }
     };
 

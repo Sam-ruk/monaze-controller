@@ -4,7 +4,7 @@ import io, { Socket } from 'socket.io-client';
 
 interface SocketEvents {
   join: (data: { playerId: string }) => void;
-  tilt: (data: { x: number; z: number }) => void;
+  tilt: (data: { playerId: string, x: number; z: number }) => void;
   'player-list': (players: string[]) => void;
 }
 
